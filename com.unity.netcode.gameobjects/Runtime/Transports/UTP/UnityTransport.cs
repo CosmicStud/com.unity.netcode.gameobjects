@@ -263,26 +263,23 @@ namespace Unity.Netcode.Transports.UTP
             [SerializeField]
             public string ServerListenAddress;
 
-            private static NetworkEndPoint ParseNetworkEndpoint(string ip, ushort port)
+            [SerializeField]
+            public NetworkFamily AddressType;
+
+            private static NetworkEndPoint ParseNetworkEndpoint(string ip, ushort port, NetworkFamily type = NetworkFamily.Ipv4)
             {
-                if (!NetworkEndPoint.TryParse(ip, port, out var endpoint))
+                if (!NetworkEndPoint.TryParse(ip, port, out var endpoint, type))
                 {
-                    Debug.LogError($"Invalid network endpoint: {ip}:{port}.");
+                    Debug.LogError($"Invalid network endpoint: {ip}:{port}, Type, {type}.");
                     return default;
                 }
 
                 return endpoint;
             }
 
-            /// <summary>
-            /// Endpoint (IP address and port) clients will connect to.
-            /// </summary>
-            public NetworkEndPoint ServerEndPoint => ParseNetworkEndpoint(Address, Port);
+            public NetworkEndPoint ServerEndPoint => ParseNetworkEndpoint(Address, Port, AddressType);
 
-            /// <summary>
-            /// Endpoint (IP address and port) server will listen/bind on.
-            /// </summary>
-            public NetworkEndPoint ListenEndPoint => ParseNetworkEndpoint((ServerListenAddress == string.Empty) ? Address : ServerListenAddress, Port);
+            public NetworkEndPoint ListenEndPoint => ParseNetworkEndpoint((ServerListenAddress == string.Empty) ? Address : ServerListenAddress, Port, AddressType);
         }
 
         /// <summary>
@@ -446,11 +443,23 @@ namespace Unity.Netcode.Transports.UTP
 
             InitDriver();
 
-            int result = m_Driver.Bind(NetworkEndPoint.AnyIpv4);
-            if (result != 0)
+            if (ConnectionData.AddressType == NetworkFamily.Ipv6)
             {
-                Debug.LogError("Client failed to bind");
-                return false;
+                int result = m_Driver.Bind(NetworkEndPoint.AnyIpv6);
+                if (result != 0)
+                {
+                    Debug.LogError("Client failed to bind IPV6");
+                }
+            }
+
+            else
+            {
+                int result = m_Driver.Bind(NetworkEndPoint.AnyIpv4);
+                if (result != 0)
+                {
+                    Debug.LogError("Client failed to bind IPV4");
+                    return false;
+                }
             }
 
             var serverConnection = m_Driver.Connect(serverEndpoint);
@@ -593,16 +602,14 @@ namespace Unity.Netcode.Transports.UTP
         /// <summary>
         /// Sets IP and Port information. This will be ignored if using the Unity Relay and you should call <see cref="SetRelayServerData"/>
         /// </summary>
-        /// <param name="ipv4Address">The remote IP address</param>
-        /// <param name="port">The remote port</param>
-        /// <param name="listenAddress">The local listen address</param>
-        public void SetConnectionData(string ipv4Address, ushort port, string listenAddress = null)
+        public void SetConnectionData(string ipAddress, ushort port, string listenAddress = null, NetworkFamily type = NetworkFamily.Ipv4)
         {
             ConnectionData = new ConnectionAddressData
             {
-                Address = ipv4Address,
+                Address = ipAddress,
                 Port = port,
-                ServerListenAddress = listenAddress ?? string.Empty
+                ServerListenAddress = listenAddress ?? string.Empty,
+                AddressType = type
             };
 
             SetProtocol(ProtocolType.UnityTransport);
