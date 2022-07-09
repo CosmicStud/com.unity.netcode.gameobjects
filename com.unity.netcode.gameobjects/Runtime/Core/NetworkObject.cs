@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Unity.Netcode
 {
@@ -180,9 +181,57 @@ namespace Unity.Netcode
             return Observers.Contains(clientId);
         }
 
+        /// <summary>
+        ///  In the event the scene of origin gets unloaded, we keep
+        ///  the most important part to uniquely identify in-scene
+        ///  placed NetworkObjects
+        /// </summary>
+        internal int SceneOriginHandle = 0;
+
+        private Scene m_SceneOrigin;
+        /// <summary>
+        /// The scene where the NetworkObject was first instantiated
+        /// Note: Primarily for in-scene placed NetworkObjects
+        /// We need to keep track of the original scene of origin for
+        /// the NetworkObject in order to be able to uniquely identify it
+        /// using the scene of origin's handle.
+        /// </summary>
+        internal Scene SceneOrigin
+        {
+            get
+            {
+                return m_SceneOrigin;
+            }
+
+            set
+            {
+                // The scene origin should only be set once.
+                // Once set, it should never change.
+                if (SceneOriginHandle == 0 && value.IsValid() && value.isLoaded)
+                {
+                    m_SceneOrigin = value;
+                    SceneOriginHandle = value.handle;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Helper method to return the correct scene handle
+        /// Note: Do not use this within NetworkSpawnManager.SpawnNetworkObjectLocallyCommon
+        /// </summary>
+        internal int GetSceneOriginHandle()
+        {
+            if (SceneOriginHandle == 0 && IsSpawned && IsSceneObject != false)
+            {
+                throw new Exception($"{nameof(GetSceneOriginHandle)} called when {nameof(SceneOriginHandle)} is still zero but the {nameof(NetworkObject)} is already spawned!");
+            }
+            return SceneOriginHandle != 0 ? SceneOriginHandle : gameObject.scene.handle;
+        }
+
         private void Awake()
         {
             SetCachedParent(transform.parent);
+            SceneOrigin = gameObject.scene;
         }
 
         /// <summary>
@@ -285,7 +334,8 @@ namespace Unity.Netcode
 
             var message = new DestroyObjectMessage
             {
-                NetworkObjectId = NetworkObjectId
+                NetworkObjectId = NetworkObjectId,
+                DestroyGameObject = true
             };
             // Send destroy call
             var size = NetworkManager.SendMessage(ref message, NetworkDelivery.ReliableSequenced, clientId);
@@ -491,16 +541,34 @@ namespace Unity.Netcode
             m_LatestParent = latestParent;
         }
 
+        /// <summary>
+        /// Set the parent of the NetworkObject transform.
+        /// </summary>
+        /// <param name="parent">The new parent for this NetworkObject transform will be the child of.</param>
+        /// <param name="worldPositionStays">If true, the parent-relative position, scale and rotation are modified such that the object keeps the same world space position, rotation and scale as before.</param>
+        /// <returns>Whether or not reparenting was successful.</returns>
         public bool TrySetParent(Transform parent, bool worldPositionStays = true)
         {
             return TrySetParent(parent.GetComponent<NetworkObject>(), worldPositionStays);
         }
 
+        /// <summary>
+        /// Set the parent of the NetworkObject transform.
+        /// </summary>
+        /// <param name="parent">The new parent for this NetworkObject transform will be the child of.</param>
+        /// <param name="worldPositionStays">If true, the parent-relative position, scale and rotation are modified such that the object keeps the same world space position, rotation and scale as before.</param>
+        /// <returns>Whether or not reparenting was successful.</returns>
         public bool TrySetParent(GameObject parent, bool worldPositionStays = true)
         {
             return TrySetParent(parent.GetComponent<NetworkObject>(), worldPositionStays);
         }
 
+        /// <summary>
+        /// Set the parent of the NetworkObject transform.
+        /// </summary>
+        /// <param name="parent">The new parent for this NetworkObject transform will be the child of.</param>
+        /// <param name="worldPositionStays">If true, the parent-relative position, scale and rotation are modified such that the object keeps the same world space position, rotation and scale as before.</param>
+        /// <returns>Whether or not reparenting was successful.</returns>
         public bool TrySetParent(NetworkObject parent, bool worldPositionStays = true)
         {
             if (!AutoObjectParentSync)
@@ -765,8 +833,8 @@ namespace Unity.Netcode
         // if and when we have different systems for where it is expected that orphans survive across ticks,
         //   then this warning will remind us that we need to revamp the system because then we can no longer simply
         //   spawn the orphan without its parent (at least, not when its transform is set to local coords mode)
-        //   - because then you’ll have children popping at the wrong location not having their parent’s global position to root them
-        //   - and then they’ll pop to the correct location after they get the parent, and that would be not good
+        //   - because then you'll have children popping at the wrong location not having their parent's global position to root them
+        //   - and then they'll pop to the correct location after they get the parent, and that would be not good
         internal static void VerifyParentingStatus()
         {
             if (NetworkLog.CurrentLogLevel <= LogLevel.Normal)
@@ -910,7 +978,7 @@ namespace Unity.Netcode
                 // sizes for dynamically spawned NetworkObjects.
                 if (Header.IsSceneObject)
                 {
-                    writer.WriteValue(OwnerObject.gameObject.scene.handle);
+                    writer.WriteValue(OwnerObject.GetSceneOriginHandle());
                 }
 
                 OwnerObject.WriteNetworkVariableData(writer, TargetClientId);
@@ -960,7 +1028,7 @@ namespace Unity.Netcode
                 // NetworkObject instance.
                 if (Header.IsSceneObject)
                 {
-                    reader.ReadValue(out NetworkSceneHandle);
+                    reader.ReadValueSafe(out NetworkSceneHandle);
                 }
             }
         }

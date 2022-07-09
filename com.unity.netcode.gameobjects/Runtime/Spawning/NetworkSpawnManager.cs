@@ -126,6 +126,7 @@ namespace Unity.Netcode
         /// Returns a list of all NetworkObjects that belong to a client.
         /// </summary>
         /// <param name="clientId">the client's id  <see cref="NetworkManager.LocalClientId"/></param>
+        /// <returns>returns the list of <see cref="NetworkObject"/>s owned by the client</returns>
         public List<NetworkObject> GetClientOwnedObjects(ulong clientId)
         {
             if (!OwnershipToObjectsTable.ContainsKey(clientId))
@@ -172,9 +173,11 @@ namespace Unity.Netcode
             return GetPlayerNetworkObject(NetworkManager.LocalClientId);
         }
 
+
         /// <summary>
         /// Returns the player object with a given clientId or null if one does not exist. This is only valid server side.
         /// </summary>
+        /// <param name="clientId">the client identifier of the player</param>
         /// <returns>The player object with a given clientId or null if one does not exist</returns>
         public NetworkObject GetPlayerNetworkObject(ulong clientId)
         {
@@ -477,15 +480,15 @@ namespace Unity.Netcode
                 return;
             }
 
-            // this initialization really should be at the bottom of the function
             networkObject.IsSpawned = true;
-
-            // this initialization really should be at the top of this function. If and when we break the
-            //  NetworkVariable dependency on NetworkBehaviour, this otherwise creates problems because
-            //  SetNetworkVariableData above calls InitializeVariables, and the 'baked out' data isn't ready there;
-            //  the current design banks on getting the network behaviour set and then only reading from it after the
-            //  below initialization code. However cowardice compels me to hold off on moving this until that commit
             networkObject.IsSceneObject = sceneObject;
+
+            // Always check to make sure our scene of origin is properly set for in-scene placed NetworkObjects
+            // Note: Always check SceneOriginHandle directly at this specific location.
+            if (networkObject.IsSceneObject != false && networkObject.SceneOriginHandle == 0)
+            {
+                networkObject.SceneOrigin = networkObject.gameObject.scene;
+            }
 
             // For integration testing, this makes sure that the appropriate NetworkManager is assigned to
             // the NetworkObject since it uses the NetworkManager.Singleton when not set
@@ -810,6 +813,9 @@ namespace Unity.Netcode
             {
                 SpawnedObjectsList.Remove(networkObject);
             }
+
+            // Always clear out the observers list when despawned
+            networkObject.Observers.Clear();
 
             var gobj = networkObject.gameObject;
             if (destroyGameObject && gobj != null)
