@@ -135,7 +135,7 @@ namespace Unity.Netcode
         /// <summary>
         /// Whether or not to enable automatic NetworkObject parent synchronization.
         /// </summary>
-        public bool AutoObjectParentSync = true;
+        public bool AutoObjectParentSync = false;
 
         internal readonly HashSet<ulong> Observers = new HashSet<ulong>();
 
@@ -539,6 +539,8 @@ namespace Unity.Netcode
 
         private void OnTransformParentChanged()
         {
+            // Debug.Log("Parent Change For Network Object: " + gameObject + ", Auto Object Parent Sync, " + AutoObjectParentSync);
+
             if (!AutoObjectParentSync)
             {
                 return;

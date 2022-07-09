@@ -8,7 +8,7 @@ namespace Unity.Netcode
     {
 
 #if UNITY_NETCODE_DEBUG_NO_PACKING
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReadValuePacked<T>(FastBufferReader reader, out T value) where T: unmanaged => reader.ReadValueSafe(out value);
 #else
@@ -302,7 +302,7 @@ namespace Unity.Netcode
 #endif
 
 #if UNITY_NETCODE_DEBUG_NO_PACKING
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReadValueBitPacked<T>(FastBufferReader reader, T value) where T: unmanaged => reader.ReadValueSafe(out value);
 #else

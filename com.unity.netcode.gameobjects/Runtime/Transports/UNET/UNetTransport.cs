@@ -130,6 +130,11 @@ namespace Unity.Netcode.Transports.UNET
             }
             else
             {
+                // if (buffer != null)
+                // {
+                //     Debug.Log("Transport: Size, " + buffer.Length);
+                // }
+
                 UnityEngine.Networking.NetworkTransport.Send(hostId, connectionId, channelId, buffer, payload.Count, out byte error);
             }
         }
