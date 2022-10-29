@@ -12,7 +12,6 @@ namespace Unity.Netcode
     public class NetworkList<T> : NetworkVariableBase where T : unmanaged, IEquatable<T>
     {
         private NativeList<T> m_List = new NativeList<T>(64, Allocator.Persistent);
-        private NativeList<T> m_ListAtLastReset = new NativeList<T>(64, Allocator.Persistent);
         private NativeList<NetworkListEvent<T>> m_DirtyEvents = new NativeList<NetworkListEvent<T>>(64, Allocator.Persistent);
 
         /// <summary>
@@ -40,9 +39,13 @@ namespace Unity.Netcode
             NetworkVariableWritePermission writePerm = DefaultWritePerm)
             : base(readPerm, writePerm)
         {
-            foreach (var value in values)
+            // allow null IEnumerable<T> to mean "no values"
+            if (values != null)
             {
-                m_List.Add(value);
+                foreach (var value in values)
+                {
+                    m_List.Add(value);
+                }
             }
         }
 
@@ -53,7 +56,6 @@ namespace Unity.Netcode
             if (m_DirtyEvents.Length > 0)
             {
                 m_DirtyEvents.Clear();
-                m_ListAtLastReset.CopyFrom(m_List);
             }
         }
 
@@ -135,26 +137,10 @@ namespace Unity.Netcode
         /// <inheritdoc />
         public override void WriteField(FastBufferWriter writer)
         {
-            // The listAtLastReset mechanism was put in place to deal with duplicate adds
-            // upon initial spawn. However, it causes issues with in-scene placed objects
-            // due to difference in spawn order. In order to address this, we pick the right
-            // list based on the type of object.
-            bool isSceneObject = m_NetworkBehaviour.NetworkObject.IsSceneObject != false;
-            if (isSceneObject)
+            writer.WriteValueSafe((ushort)m_List.Length);
+            for (int i = 0; i < m_List.Length; i++)
             {
-                writer.WriteValueSafe((ushort)m_ListAtLastReset.Length);
-                for (int i = 0; i < m_ListAtLastReset.Length; i++)
-                {
-                    NetworkVariableSerialization<T>.Write(writer, ref m_ListAtLastReset.ElementAt(i));
-                }
-            }
-            else
-            {
-                writer.WriteValueSafe((ushort)m_List.Length);
-                for (int i = 0; i < m_List.Length; i++)
-                {
-                    NetworkVariableSerialization<T>.Write(writer, ref m_List.ElementAt(i));
-                }
+                NetworkVariableSerialization<T>.Write(writer, ref m_List.ElementAt(i));
             }
         }
 
@@ -165,7 +151,8 @@ namespace Unity.Netcode
             reader.ReadValueSafe(out ushort count);
             for (int i = 0; i < count; i++)
             {
-                NetworkVariableSerialization<T>.Read(reader, out T value);
+                var value = new T();
+                NetworkVariableSerialization<T>.Read(reader, ref value);
                 m_List.Add(value);
             }
         }
@@ -181,7 +168,8 @@ namespace Unity.Netcode
                 {
                     case NetworkListEvent<T>.EventType.Add:
                         {
-                            NetworkVariableSerialization<T>.Read(reader, out T value);
+                            var value = new T();
+                            NetworkVariableSerialization<T>.Read(reader, ref value);
                             m_List.Add(value);
 
                             if (OnListChanged != null)
@@ -209,7 +197,8 @@ namespace Unity.Netcode
                     case NetworkListEvent<T>.EventType.Insert:
                         {
                             reader.ReadValueSafe(out int index);
-                            NetworkVariableSerialization<T>.Read(reader, out T value);
+                            var value = new T();
+                            NetworkVariableSerialization<T>.Read(reader, ref value);
 
                             if (index < m_List.Length)
                             {
@@ -245,7 +234,8 @@ namespace Unity.Netcode
                         break;
                     case NetworkListEvent<T>.EventType.Remove:
                         {
-                            NetworkVariableSerialization<T>.Read(reader, out T value);
+                            var value = new T();
+                            NetworkVariableSerialization<T>.Read(reader, ref value);
                             int index = m_List.IndexOf(value);
                             if (index == -1)
                             {
@@ -307,7 +297,8 @@ namespace Unity.Netcode
                     case NetworkListEvent<T>.EventType.Value:
                         {
                             reader.ReadValueSafe(out int index);
-                            NetworkVariableSerialization<T>.Read(reader, out T value);
+                            var value = new T();
+                            NetworkVariableSerialization<T>.Read(reader, ref value);
                             if (index >= m_List.Length)
                             {
                                 throw new Exception("Shouldn't be here, index is higher than list length");
@@ -382,6 +373,12 @@ namespace Unity.Netcode
         /// <inheritdoc />
         public void Add(T item)
         {
+            // check write permissions
+            if (!CanClientWrite(m_NetworkBehaviour.NetworkManager.LocalClientId))
+            {
+                throw new InvalidOperationException("Client is not allowed to write to this NetworkList");
+            }
+
             m_List.Add(item);
 
             var listEvent = new NetworkListEvent<T>()
@@ -397,6 +394,12 @@ namespace Unity.Netcode
         /// <inheritdoc />
         public void Clear()
         {
+            // check write permissions
+            if (!CanClientWrite(m_NetworkBehaviour.NetworkManager.LocalClientId))
+            {
+                throw new InvalidOperationException("Client is not allowed to write to this NetworkList");
+            }
+
             m_List.Clear();
 
             var listEvent = new NetworkListEvent<T>()
@@ -417,6 +420,12 @@ namespace Unity.Netcode
         /// <inheritdoc />
         public bool Remove(T item)
         {
+            // check write permissions
+            if (!CanClientWrite(m_NetworkBehaviour.NetworkManager.LocalClientId))
+            {
+                throw new InvalidOperationException("Client is not allowed to write to this NetworkList");
+            }
+
             int index = NativeArrayExtensions.IndexOf(m_List, item);
             if (index == -1)
             {
@@ -446,6 +455,12 @@ namespace Unity.Netcode
         /// <inheritdoc />
         public void Insert(int index, T item)
         {
+            // check write permissions
+            if (!CanClientWrite(m_NetworkBehaviour.NetworkManager.LocalClientId))
+            {
+                throw new InvalidOperationException("Client is not allowed to write to this NetworkList");
+            }
+
             if (index < m_List.Length)
             {
                 m_List.InsertRangeWithBeginEnd(index, index + 1);
@@ -469,6 +484,12 @@ namespace Unity.Netcode
         /// <inheritdoc />
         public void RemoveAt(int index)
         {
+            // check write permissions
+            if (!CanClientWrite(m_NetworkBehaviour.NetworkManager.LocalClientId))
+            {
+                throw new InvalidOperationException("Client is not allowed to write to this NetworkList");
+            }
+
             m_List.RemoveAt(index);
 
             var listEvent = new NetworkListEvent<T>()
@@ -486,6 +507,12 @@ namespace Unity.Netcode
             get => m_List[index];
             set
             {
+                // check write permissions
+                if (!CanClientWrite(m_NetworkBehaviour.NetworkManager.LocalClientId))
+                {
+                    throw new InvalidOperationException("Client is not allowed to write to this NetworkList");
+                }
+
                 var previousValue = m_List[index];
                 m_List[index] = value;
 
@@ -528,7 +555,6 @@ namespace Unity.Netcode
         public override void Dispose()
         {
             m_List.Dispose();
-            m_ListAtLastReset.Dispose();
             m_DirtyEvents.Dispose();
         }
     }

@@ -286,7 +286,18 @@ namespace Unity.Netcode
         /// Gets the NetworkManager that owns this NetworkBehaviour instance
         ///   See note around `NetworkObject` for how there is a chicken / egg problem when we are not initialized
         /// </summary>
-        public NetworkManager NetworkManager => NetworkObject.NetworkManager;
+        public NetworkManager NetworkManager
+        {
+            get
+            {
+                if (NetworkObject?.NetworkManager != null)
+                {
+                    return NetworkObject?.NetworkManager;
+                }
+
+                return NetworkManager.Singleton;
+            }
+        }
 
         /// <summary>
         /// If a NetworkObject is assigned, it will return whether or not this NetworkObject
@@ -335,23 +346,29 @@ namespace Unity.Netcode
                 m_NetworkObject.NetworkManager.IsServer;
         }
 
-        /// <summary>
-        /// Gets the NetworkObject that owns this NetworkBehaviour instance
         ///  TODO: this needs an overhaul.  It's expensive, it's ja little naive in how it looks for networkObject in
         ///   its parent and worst, it creates a puzzle if you are a NetworkBehaviour wanting to see if you're live or not
         ///   (e.g. editor code).  All you want to do is find out if NetworkManager is null, but to do that you
         ///   need NetworkObject, but if you try and grab NetworkObject and NetworkManager isn't up you'll get
         ///   the warning below.  This is why IsBehaviourEditable had to be created.  Matt was going to re-do
         ///   how NetworkObject works but it was close to the release and too risky to change
-        ///
+        /// <summary>
+        /// Gets the NetworkObject that owns this NetworkBehaviour instance
         /// </summary>
         public NetworkObject NetworkObject
         {
             get
             {
-                if (m_NetworkObject == null)
+                try
                 {
-                    m_NetworkObject = GetComponentInParent<NetworkObject>();
+                    if (m_NetworkObject == null)
+                    {
+                        m_NetworkObject = GetComponentInParent<NetworkObject>();
+                    }
+                }
+                catch (Exception)
+                {
+                    return null;
                 }
 
                 // ShutdownInProgress check:
@@ -475,6 +492,15 @@ namespace Unity.Netcode
             catch (Exception e)
             {
                 Debug.LogException(e);
+            }
+
+            InitializeVariables();
+            if (IsServer)
+            {
+                // Since we just spawned the object and since user code might have modified their NetworkVariable, esp.
+                // NetworkList, we need to mark the object as free of updates.
+                // This should happen for all objects on the machine triggering the spawn.
+                PostNetworkVariableWrite(true);
             }
         }
 
@@ -622,12 +648,24 @@ namespace Unity.Netcode
             NetworkVariableIndexesToResetSet.Clear();
         }
 
-        internal void PostNetworkVariableWrite()
+        internal void PostNetworkVariableWrite(bool forced = false)
         {
-            // mark any variables we wrote as no longer dirty
-            for (int i = 0; i < NetworkVariableIndexesToReset.Count; i++)
+            if (forced)
             {
-                NetworkVariableFields[NetworkVariableIndexesToReset[i]].ResetDirty();
+                // Mark every variable as no longer dirty. We just spawned the object and whatever the game code did
+                // during OnNetworkSpawn has been sent and needs to be cleared
+                for (int i = 0; i < NetworkVariableFields.Count; i++)
+                {
+                    NetworkVariableFields[i].ResetDirty();
+                }
+            }
+            else
+            {
+                // mark any variables we wrote as no longer dirty
+                for (int i = 0; i < NetworkVariableIndexesToReset.Count; i++)
+                {
+                    NetworkVariableFields[NetworkVariableIndexesToReset[i]].ResetDirty();
+                }
             }
 
             MarkVariablesDirty(false);
