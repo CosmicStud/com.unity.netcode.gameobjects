@@ -1,4 +1,3 @@
-
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -10,24 +9,58 @@ Additional documentation and release notes are available at [Multiplayer Documen
 ## [Unreleased]
 
 ### Added
-- Added `NetworkObject` auto-add helper and Multiplayer Tools install reminder settings to Project Settings. (#2285)
-- Added `public string DisconnectReason` getter to `NetworkManager` and `string Reason` to `ConnectionApprovalResponse`. Allows connection approval to communicate back a reason. Also added `public void DisconnectClient(ulong clientId, string reason)` allowing setting a disconnection reason, when explicitly disconnecting a client. 
 
 ### Changed
 
+- Updated `UnityTransport` dependency on `com.unity.transport` to 1.3.1.
+- `NetworkShow()` of `NetworkObject`s are delayed until the end of the frame to ensure consistency of delta-driven variables like `NetworkList`.
+- Dirty `NetworkObject` are reset at end-of-frame and not at serialization time.
+- `NetworkHide()` of an object that was just `NetworkShow()`n produces a warning, as remote clients will _not_ get a spawn/despawn pair.
+- The default listen address of `UnityTransport` is now 0.0.0.0. (#2307)
+- Renamed the NetworkTransform.SetState parameter `shouldGhostsInterpolate` to `teleportDisabled` for better clarity of what that parameter does. (#2228)
+- Network prefabs are now stored in a ScriptableObject that can be shared between NetworkManagers, and have been exposed for public access. By default, a Default Prefabs List is created that contains all NetworkObject prefabs in the project, and new NetworkManagers will default to using that unless that option is turned off in the Netcode for GameObjects settings. Existing NetworkManagers will maintain their existing lists, which can be migrated to the new format via a button in their inspector. (#2322)
+
+### Fixed
+- Fixed a UTP test that was failing when you install Unity Transport package 2.0.0 or newer. (#2347)
+- Fixed issue where `NetcodeSettingsProvider` would throw an exception in Unity 2020.3.x versions. (#2345)
+- Fixed server side issue where, depending upon component ordering, some NetworkBehaviour components might not have their OnNetworkDespawn method invoked if the client side disconnected. (#2323)
+- Fixed a case where data corruption could occur when using UnityTransport when reaching a certain level of send throughput. (#2332)
+- Fixed an issue in `UnityTransport` where an exception would be thrown if starting a Relay host/server on WebGL. This exception should only be thrown if using direct connections (where WebGL can't act as a host/server). (#2321)
+- Fixed `NetworkAnimator` issue where it was not checking for `AnimatorStateTtansition.destinationStateMachine` and any possible sub-states defined within it. (#2309)
+- Fixed `NetworkAnimator` issue where the host client was receiving the ClientRpc animation updates when the host was the owner.(#2309)
+- Fixed `NetworkAnimator` issue with using pooled objects and when specific properties are cleaned during despawn and destroy.(#2309)
+- Fixed issue where `NetworkAnimator` was checking for animation changes when the associated `NetworkObject` was not spawned.(#2309)
+
+## [1.2.0] - 2022-11-21
+
+### Added
+
+- Added protected method `NetworkBehaviour.OnSynchronize` which is invoked during the initial `NetworkObject` synchronization process. This provides users the ability to include custom serialization information that will be applied to the `NetworkBehaviour` prior to the `NetworkObject` being spawned. (#2298)
+- Added support for different versions of the SDK to talk to each other in circumstances where changes permit it. Starting with this version and into future versions, patch versions should be compatible as long as the minor version is the same. (#2290)
+- Added `NetworkObject` auto-add helper and Multiplayer Tools install reminder settings to Project Settings. (#2285)
+- Added `public string DisconnectReason` getter to `NetworkManager` and `string Reason` to `ConnectionApprovalResponse`. Allows connection approval to communicate back a reason. Also added `public void DisconnectClient(ulong clientId, string reason)` allowing setting a disconnection reason, when explicitly disconnecting a client. (#2280)
+
+### Changed
+
+- Changed 3rd-party `XXHash` (32 & 64) implementation with an in-house reimplementation (#2310)
+- When `NetworkConfig.EnsureNetworkVariableLengthSafety` is disabled `NetworkVariable` fields do not write the additional `ushort` size value (_which helps to reduce the total synchronization message size_), but when enabled it still writes the additional `ushort` value. (#2298)
 - Optimized bandwidth usage by encoding most integer fields using variable-length encoding. (#2276)
 
 ### Fixed
-
+- Fixed `IsSpawnedObjectsPendingInDontDestroyOnLoad` is only set to true when loading a scene using `LoadSceneMode.Singleonly`. (#2330)
+- Fixed issue where `NetworkTransform` components nested under a parent with a `NetworkObject` component  (i.e. network prefab) would not have their associated `GameObject`'s transform synchronized. (#2298)
+- Fixed issue where `NetworkObject`s that failed to instantiate could cause the entire synchronization pipeline to be disrupted/halted for a connecting client. (#2298)
+- Fixed issue where in-scene placed `NetworkObject`s nested under a `GameObject` would be added to the orphaned children list causing continual console warning log messages. (#2298)
 - Custom messages are now properly received by the local client when they're sent while running in host mode. (#2296)
 - Fixed issue where the host would receive more than one event completed notification when loading or unloading a scene only when no clients were connected. (#2292)
 - Fixed an issue in `UnityTransport` where an error would be logged if the 'Use Encryption' flag was enabled with a Relay configuration that used a secure protocol. (#2289)
 - Fixed issue where in-scene placed `NetworkObjects` were not honoring the `AutoObjectParentSync` property. (#2281)
 - Fixed the issue where `NetworkManager.OnClientConnectedCallback` was being invoked before in-scene placed `NetworkObject`s had been spawned when starting `NetworkManager` as a host. (#2277)
 - Creating a `FastBufferReader` with `Allocator.None` will not result in extra memory being allocated for the buffer (since it's owned externally in that scenario). (#2265)
-### Removed
-- Removed the `NetworkObject` auto-add and Multiplayer Tools install reminder settings from the Menu interface. (#2285)
 
+### Removed
+
+- Removed the `NetworkObject` auto-add and Multiplayer Tools install reminder settings from the Menu interface. (#2285)
 
 ## [1.1.0] - 2022-10-21
 
@@ -179,6 +212,7 @@ Additional documentation and release notes are available at [Multiplayer Documen
 - Removed `ClientNetworkTransform` from the package samples and moved to Boss Room's Utilities package which can be found [here](https://github.com/Unity-Technologies/com.unity.multiplayer.samples.coop/blob/main/Packages/com.unity.multiplayer.samples.coop/Utilities/Net/ClientAuthority/ClientNetworkTransform.cs) (#1912)
 
 ### Fixed
+
 - Fixed issue where `NetworkSceneManager` did not synchronize despawned in-scene placed NetworkObjects. (#1898)
 - Fixed `NetworkTransform` generating false positive rotation delta checks when rolling over between 0 and 360 degrees. (#1890)
 - Fixed client throwing an exception if it has messages in the outbound queue when processing the `NetworkEvent.Disconnect` event and is using UTP. (#1884)
@@ -232,10 +266,12 @@ Additional documentation and release notes are available at [Multiplayer Documen
 ## [1.0.0-pre.6] - 2022-03-02
 
 ### Added
+
 - NetworkAnimator now properly synchrhonizes all animation layers as well as runtime-adjusted weighting between them (#1765)
 - Added first set of tests for NetworkAnimator - parameter syncing, trigger set / reset, override network animator (#1735)
 
 ### Fixed
+
 - Fixed an issue where sometimes the first client to connect to the server could see messages from the server as coming from itself. (#1683)
 - Fixed an issue where clients seemed to be able to send messages to ClientId 1, but these messages would actually still go to the server (id 0) instead of that client. (#1683)
 - Improved clarity of error messaging when a client attempts to send a message to a destination other than the server, which isn't allowed. (#1683)
@@ -287,6 +323,7 @@ Additional documentation and release notes are available at [Multiplayer Documen
 - Removed `FixedQueue`, `StreamExtensions`, `TypeExtensions` (#1398)
 
 ### Fixed
+
 - Fixed in-scene NetworkObjects that are moved into the DDOL scene not getting restored to their original active state (enabled/disabled) after a full scene transition (#1354)
 - Fixed invalid IL code being generated when using `this` instead of `this ref` for the FastBufferReader/FastBufferWriter parameter of an extension method. (#1393)
 - Fixed an issue where if you are running as a server (not host) the LoadEventCompleted and UnloadEventCompleted events would fire early by the NetworkSceneManager (#1379)
@@ -301,6 +338,7 @@ Additional documentation and release notes are available at [Multiplayer Documen
 - Fixed network tick value sometimes being duplicated or skipped. (#1614)
 
 ### Changed
+
 - The SDK no longer limits message size to 64k. (The transport may still impose its own limits, but the SDK no longer does.) (#1384)
 - Updated com.unity.collections to 1.1.0 (#1451)
 - NetworkManager's GameObject is no longer allowed to be nested under one or more GameObject(s).(#1484)

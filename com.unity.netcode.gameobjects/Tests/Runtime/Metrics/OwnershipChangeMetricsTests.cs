@@ -25,10 +25,10 @@ namespace Unity.Netcode.RuntimeTests.Metrics
             NetcodeIntegrationTestHelpers.MakeNetworkObjectTestPrefab(m_NewNetworkPrefab);
 
             var networkPrefab = new NetworkPrefab { Prefab = gameObject };
-            m_ServerNetworkManager.NetworkConfig.NetworkPrefabs.Add(networkPrefab);
+            m_ServerNetworkManager.NetworkConfig.Prefabs.Add(networkPrefab);
             foreach (var client in m_ClientNetworkManagers)
             {
-                client.NetworkConfig.NetworkPrefabs.Add(networkPrefab);
+                client.NetworkConfig.Prefabs.Add(networkPrefab);
             }
             base.OnServerAndClientsCreated();
         }
@@ -52,7 +52,7 @@ namespace Unity.Netcode.RuntimeTests.Metrics
                 OwnerClientId = newOwner
             };
             using var writer = new FastBufferWriter(1024, Allocator.Temp);
-            message.Serialize(writer);
+            message.Serialize(writer, message.Version);
             return writer.Length;
         }
 

@@ -270,6 +270,9 @@ namespace Unity.Netcode
 
             networkObject.OwnerClientId = clientId;
 
+            networkObject.MarkVariablesDirty(true);
+            NetworkManager.BehaviourUpdater.AddForUpdate(networkObject);
+
             // Server adds entries for all client ownership
             UpdateOwnershipTable(networkObject, networkObject.OwnerClientId);
 
@@ -297,7 +300,7 @@ namespace Unity.Netcode
                 {
                     return true;
                 }
-                if (NetworkManager.NetworkConfig.NetworkPrefabOverrideLinks.TryGetValue(sceneObject.Hash, out var networkPrefab))
+                if (NetworkManager.NetworkConfig.Prefabs.NetworkPrefabOverrideLinks.TryGetValue(sceneObject.Hash, out var networkPrefab))
                 {
                     switch (networkPrefab.Override)
                     {
@@ -349,17 +352,17 @@ namespace Unity.Netcode
                 {
                     // See if there is a valid registered NetworkPrefabOverrideLink associated with the provided prefabHash
                     GameObject networkPrefabReference = null;
-                    if (NetworkManager.NetworkConfig.NetworkPrefabOverrideLinks.ContainsKey(globalObjectIdHash))
+                    if (NetworkManager.NetworkConfig.Prefabs.NetworkPrefabOverrideLinks.ContainsKey(globalObjectIdHash))
                     {
-                        switch (NetworkManager.NetworkConfig.NetworkPrefabOverrideLinks[globalObjectIdHash].Override)
+                        switch (NetworkManager.NetworkConfig.Prefabs.NetworkPrefabOverrideLinks[globalObjectIdHash].Override)
                         {
                             default:
                             case NetworkPrefabOverride.None:
-                                networkPrefabReference = NetworkManager.NetworkConfig.NetworkPrefabOverrideLinks[globalObjectIdHash].Prefab;
+                                networkPrefabReference = NetworkManager.NetworkConfig.Prefabs.NetworkPrefabOverrideLinks[globalObjectIdHash].Prefab;
                                 break;
                             case NetworkPrefabOverride.Hash:
                             case NetworkPrefabOverride.Prefab:
-                                networkPrefabReference = NetworkManager.NetworkConfig.NetworkPrefabOverrideLinks[globalObjectIdHash].OverridingTargetPrefab;
+                                networkPrefabReference = NetworkManager.NetworkConfig.Prefabs.NetworkPrefabOverrideLinks[globalObjectIdHash].OverridingTargetPrefab;
                                 break;
                         }
                     }
@@ -454,8 +457,14 @@ namespace Unity.Netcode
 
                 if (sceneObject.HasParent)
                 {
-                    // Go ahead and set network parenting properties
-                    networkObject.SetNetworkParenting(parentNetworkId, worldPositionStays);
+                    // Go ahead and set network parenting properties, if the latest parent is not set then pass in null
+                    // (we always want to set worldPositionStays)
+                    ulong? parentId = null;
+                    if (sceneObject.IsLatestParentSet)
+                    {
+                        parentId = parentNetworkId;
+                    }
+                    networkObject.SetNetworkParenting(parentId, worldPositionStays);
                 }
 
 
@@ -495,8 +504,7 @@ namespace Unity.Netcode
         }
 
         // Ran on both server and client
-        internal void SpawnNetworkObjectLocally(NetworkObject networkObject, in NetworkObject.SceneObject sceneObject,
-            FastBufferReader variableData, bool destroyWithScene)
+        internal void SpawnNetworkObjectLocally(NetworkObject networkObject, in NetworkObject.SceneObject sceneObject, bool destroyWithScene)
         {
             if (networkObject == null)
             {
@@ -507,8 +515,6 @@ namespace Unity.Netcode
             {
                 throw new SpawnStateException("Object is already spawned");
             }
-
-            networkObject.SetNetworkVariableData(variableData);
 
             SpawnNetworkObjectLocallyCommon(networkObject, sceneObject.NetworkObjectId, sceneObject.IsSceneObject, sceneObject.IsPlayerObject, sceneObject.OwnerClientId, destroyWithScene);
         }
@@ -652,7 +658,11 @@ namespace Unity.Netcode
         // Makes scene objects ready to be reused
         internal void ServerResetShudownStateForSceneObjects()
         {
+#if UNITY_2023_1_OR_NEWER
+            var networkObjects = UnityEngine.Object.FindObjectsByType<NetworkObject>(FindObjectsSortMode.InstanceID).Where((c) => c.IsSceneObject != null && c.IsSceneObject == true);
+#else
             var networkObjects = UnityEngine.Object.FindObjectsOfType<NetworkObject>().Where((c) => c.IsSceneObject != null && c.IsSceneObject == true);
+#endif
             foreach (var sobj in networkObjects)
             {
                 sobj.IsSpawned = false;
@@ -683,7 +693,11 @@ namespace Unity.Netcode
 
         internal void DespawnAndDestroyNetworkObjects()
         {
+#if UNITY_2023_1_OR_NEWER
+            var networkObjects = UnityEngine.Object.FindObjectsByType<NetworkObject>(FindObjectsSortMode.InstanceID);
+#else
             var networkObjects = UnityEngine.Object.FindObjectsOfType<NetworkObject>();
+#endif
 
             for (int i = 0; i < networkObjects.Length; i++)
             {
@@ -713,7 +727,11 @@ namespace Unity.Netcode
 
         internal void DestroySceneObjects()
         {
+#if UNITY_2023_1_OR_NEWER
+            var networkObjects = UnityEngine.Object.FindObjectsByType<NetworkObject>(FindObjectsSortMode.InstanceID);
+#else
             var networkObjects = UnityEngine.Object.FindObjectsOfType<NetworkObject>();
+#endif
 
             for (int i = 0; i < networkObjects.Length; i++)
             {
@@ -740,7 +758,11 @@ namespace Unity.Netcode
 
         internal void ServerSpawnSceneObjectsOnStartSweep()
         {
+#if UNITY_2023_1_OR_NEWER
+            var networkObjects = UnityEngine.Object.FindObjectsByType<NetworkObject>(FindObjectsSortMode.InstanceID);
+#else
             var networkObjects = UnityEngine.Object.FindObjectsOfType<NetworkObject>();
+#endif
             var networkObjectsToSpawn = new List<NetworkObject>();
 
             for (int i = 0; i < networkObjects.Length; i++)
