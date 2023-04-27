@@ -2,9 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using Unity.Netcode.TestHelpers.Runtime;
 using UnityEngine;
 using UnityEngine.TestTools;
-using Unity.Netcode.TestHelpers.Runtime;
 
 namespace Unity.Netcode.RuntimeTests
 {
@@ -71,7 +71,7 @@ namespace Unity.Netcode.RuntimeTests
         public NetworkList<int> MyListSetOnSpawn;
         public NetworkVariable<int> MyOwnerReadNetworkVariable;
         public NetworkList<int> MyList;
-        static public NetworkManager NetworkManagerOfInterest;
+        public static NetworkManager NetworkManagerOfInterest;
 
         internal static int GainOwnershipCount = 0;
 
@@ -114,10 +114,7 @@ namespace Unity.Netcode.RuntimeTests
         public void SomeRandomClientRPC()
         {
             Debug.Log($"RPC called {NetworkManager.LocalClientId}");
-            if (ClientIdsRpcCalledOn != null)
-            {
-                ClientIdsRpcCalledOn.Add(NetworkManager.LocalClientId);
-            }
+            ClientIdsRpcCalledOn?.Add(NetworkManager.LocalClientId);
         }
 
         public void TriggerRpc()
@@ -152,7 +149,7 @@ namespace Unity.Netcode.RuntimeTests
             int count = 0;
             do
             {
-                yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 5);
+                yield return WaitForTicks(m_ServerNetworkManager, 5);
                 count++;
 
                 if (count > 20)
@@ -208,10 +205,12 @@ namespace Unity.Netcode.RuntimeTests
             }
             else
             {
-                var list = new List<NetworkObject>();
-                list.Add(m_NetSpawnedObject1);
-                list.Add(m_NetSpawnedObject2);
-                list.Add(m_NetSpawnedObject3);
+                var list = new List<NetworkObject>
+                {
+                    m_NetSpawnedObject1,
+                    m_NetSpawnedObject2,
+                    m_NetSpawnedObject3
+                };
 
                 if (!visibility)
                 {
@@ -268,11 +267,11 @@ namespace Unity.Netcode.RuntimeTests
                 // hide them on one client
                 Show(mode == 0, false);
 
-                yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 5);
+                yield return WaitForTicks(m_ServerNetworkManager, 5);
 
                 m_NetSpawnedObject1.GetComponent<ShowHideObject>().MyNetworkVariable.Value = 3;
 
-                yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 5);
+                yield return WaitForTicks(m_ServerNetworkManager, 5);
 
                 // verify they got hidden
                 yield return CheckVisible(false);
@@ -314,10 +313,10 @@ namespace Unity.Netcode.RuntimeTests
                 Show(mode == 0, false);
                 Show(mode == 0, true);
 
-                yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 5);
+                yield return WaitForTicks(m_ServerNetworkManager, 5);
                 yield return WaitForConditionOrTimeOut(RefreshNetworkObjects);
                 AssertOnTimeout($"Could not refresh all NetworkObjects!");
-                yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 5);
+                yield return WaitForTicks(m_ServerNetworkManager, 5);
 
                 // verify they become visible
                 yield return CheckVisible(true);
@@ -343,7 +342,7 @@ namespace Unity.Netcode.RuntimeTests
             m_NetSpawnedObject1.NetworkHide(m_ClientId0);
             m_NetSpawnedObject1.Despawn();
 
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 5);
+            yield return WaitForTicks(m_ServerNetworkManager, 5);
 
             LogAssert.NoUnexpectedReceived();
         }
@@ -400,7 +399,7 @@ namespace Unity.Netcode.RuntimeTests
             m_NetSpawnedObject1.GetComponent<ShowHideObject>().MyOwnerReadNetworkVariable.Value++;
 
             // wait for three ticks
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
 
             // check we'll actually be changing owners
             Assert.False(ShowHideObject.ClientTargetedNetworkObjects[0].OwnerClientId == m_ClientNetworkManagers[0].LocalClientId);
@@ -412,8 +411,8 @@ namespace Unity.Netcode.RuntimeTests
             m_NetSpawnedObject1.ChangeOwnership(m_ClientNetworkManagers[0].LocalClientId);
 
             // wait three ticks
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ClientNetworkManagers[0], 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ClientNetworkManagers[0], 3);
 
             // verify ownership changed
             Assert.True(ShowHideObject.ClientTargetedNetworkObjects[0].OwnerClientId == m_ClientNetworkManagers[0].LocalClientId);
@@ -461,22 +460,22 @@ namespace Unity.Netcode.RuntimeTests
             Debug.Log("Hiding");
             // hide
             m_NetSpawnedObject1.NetworkHide(1);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ClientNetworkManagers[0], 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ClientNetworkManagers[0], 3);
 
             Debug.Log("Showing and Hiding");
             // show and hide
             m_NetSpawnedObject1.NetworkShow(1);
             m_NetSpawnedObject1.NetworkHide(1);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ClientNetworkManagers[0], 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ClientNetworkManagers[0], 3);
 
             Debug.Log("Modifying and Showing");
             // modify and show
             m_NetSpawnedObject1.GetComponent<ShowHideObject>().MyList.Add(5);
             m_NetSpawnedObject1.NetworkShow(1);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ClientNetworkManagers[0], 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ClientNetworkManagers[0], 3);
         }
 
 
@@ -484,14 +483,14 @@ namespace Unity.Netcode.RuntimeTests
         {
             // hide
             m_NetSpawnedObject1.NetworkHide(1);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
 
             // modify
             m_NetSpawnedObject1.GetComponent<ShowHideObject>().MyList.Add(5);
             // show
             m_NetSpawnedObject1.NetworkShow(1);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ClientNetworkManagers[0], 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ClientNetworkManagers[0], 3);
 
         }
 
@@ -499,26 +498,26 @@ namespace Unity.Netcode.RuntimeTests
         {
             // hide
             m_NetSpawnedObject1.NetworkHide(1);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
 
             // show
             m_NetSpawnedObject1.NetworkShow(1);
             // modify
             m_NetSpawnedObject1.GetComponent<ShowHideObject>().MyList.Add(5);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ClientNetworkManagers[0], 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ClientNetworkManagers[0], 3);
         }
 
         private IEnumerator HideThenShowAndRPC()
         {
             // hide
             m_NetSpawnedObject1.NetworkHide(1);
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
 
             // show
             m_NetSpawnedObject1.NetworkShow(1);
             m_NetSpawnedObject1.GetComponent<ShowHideObject>().TriggerRpc();
-            yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
+            yield return WaitForTicks(m_ServerNetworkManager, 3);
         }
 
         [UnityTest]
@@ -540,8 +539,8 @@ namespace Unity.Netcode.RuntimeTests
             for (int i = 0; i < 4; i++)
             {
                 // wait for three ticks
-                yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ServerNetworkManager, 3);
-                yield return NetcodeIntegrationTestHelpers.WaitForTicks(m_ClientNetworkManagers[0], 3);
+                yield return WaitForTicks(m_ServerNetworkManager, 3);
+                yield return WaitForTicks(m_ClientNetworkManagers[0], 3);
 
                 switch (i)
                 {
@@ -561,7 +560,9 @@ namespace Unity.Netcode.RuntimeTests
                         Debug.Log("Running HideThenShowAndRPC");
                         ShowHideObject.ClientIdsRpcCalledOn = new List<ulong>();
                         yield return HideThenShowAndRPC();
-                        Debug.Assert(ShowHideObject.ClientIdsRpcCalledOn.Count == NumberOfClients + 1);
+                        // Provide enough time for slower systems or VM systems possibly under a heavy load could fail on this test
+                        yield return WaitForConditionOrTimeOut(() => ShowHideObject.ClientIdsRpcCalledOn.Count == NumberOfClients + 1);
+                        AssertOnTimeout($"Timed out waiting for ClientIdsRpcCalledOn.Count ({ShowHideObject.ClientIdsRpcCalledOn.Count}) to equal ({NumberOfClients + 1})!");
                         break;
 
                 }

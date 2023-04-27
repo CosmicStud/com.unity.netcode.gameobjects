@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using Unity.Netcode;
 using Unity.Netcode.Components;
+using UnityEngine;
 
 namespace TestProject.RuntimeTests
 {
@@ -10,7 +10,7 @@ namespace TestProject.RuntimeTests
     {
         public static AnimatorTestHelper ServerSideInstance { get; private set; }
 
-        public readonly static Dictionary<ulong, AnimatorTestHelper> ClientSideInstances = new Dictionary<ulong, AnimatorTestHelper>();
+        public static readonly Dictionary<ulong, AnimatorTestHelper> ClientSideInstances = new Dictionary<ulong, AnimatorTestHelper>();
 
         public static bool IsTriggerTest;
 
@@ -122,6 +122,13 @@ namespace TestProject.RuntimeTests
             }
         }
 
+        public const string TargetCrossFadeState = "CrossFadeState";
+
+        public void TestCrossFade()
+        {
+            m_Animator.CrossFade(TargetCrossFadeState, 0.25f, 0);
+        }
+
         public void SetBool(string name, bool valueToSet)
         {
             m_Animator.SetBool(name, valueToSet);
@@ -152,6 +159,16 @@ namespace TestProject.RuntimeTests
         public NetworkAnimator GetNetworkAnimator()
         {
             return m_NetworkAnimator;
+        }
+
+        public void SetLayerWeight(int layer, float weight)
+        {
+            m_Animator.SetLayerWeight(layer, weight);
+        }
+
+        public float GetLayerWeight(int layer)
+        {
+            return m_Animator.GetLayerWeight(layer);
         }
     }
 }

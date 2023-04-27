@@ -179,6 +179,34 @@ namespace Tests.Manual.NetworkAnimatorTests
             m_NetworkAnimator.SetTrigger("Attack");
         }
 
+        private void SetLayerWeight(int layer, float weight)
+        {
+            m_Animator.SetLayerWeight(layer, weight);
+        }
+
+        private float GetLayerWeight(int layer)
+        {
+            return m_Animator.GetLayerWeight(layer);
+        }
+
+        [ServerRpc]
+        private void TestCrossFadeServerRpc()
+        {
+            m_Animator.CrossFade("CrossFadeState", 0.25f, 0);
+        }
+
+        private void TestCrossFade()
+        {
+            if (!IsServer && m_IsServerAuthoritative)
+            {
+                TestCrossFadeServerRpc();
+            }
+            else
+            {
+                m_Animator.CrossFade("CrossFadeState", 0.25f, 0);
+            }
+        }
+
         private void LateUpdate()
         {
 
@@ -186,6 +214,10 @@ namespace Tests.Manual.NetworkAnimatorTests
             {
                 if (!IsOwner && IsSpawned)
                 {
+                    if (Input.GetKeyDown(KeyCode.Alpha4))
+                    {
+                        Debug.Log($"Layer 1 weight: {GetLayerWeight(1)}");
+                    }
                     DisplayTestIntValueIfChanged();
                     return;
                 }
@@ -194,6 +226,11 @@ namespace Tests.Manual.NetworkAnimatorTests
             }
 
             DisplayTestIntValueIfChanged();
+
+            if (Input.GetKeyDown(KeyCode.G))
+            {
+                TestCrossFade();
+            }
 
             // Rotates the cube
             if (Input.GetKeyDown(KeyCode.C))
@@ -229,6 +266,10 @@ namespace Tests.Manual.NetworkAnimatorTests
                 BeginAttack(2);
             }
 
+            if (Input.GetKeyDown(KeyCode.Alpha3))
+            {
+                SetLayerWeight(1, 0.75f);
+            }
         }
     }
 }
